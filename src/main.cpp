@@ -25,7 +25,6 @@
 
 #define PRINT_CALLBACK 0
 #define DEBUG 0
-#define LED_HEARTBEAT 0
 
 #if DEBUG
 #define PRINT(s, v)     \
@@ -42,11 +41,6 @@
 #define PRINTS(s)
 #endif
 
-#if LED_HEARTBEAT
-#define HB_LED D2
-#define HB_LED_TIME 500 // in milliseconds
-#endif
-
 // Define the number of devices we have in the chain and the hardware interface
 // NOTE: These pin numbers will probably not work with your hardware and may
 // need to be adapted
@@ -59,8 +53,6 @@
 
 // SPI hardware interface
 MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
-// Arbitrary pins
-//MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
 
 // WiFi login parameters - network name and password
 const char *ssid = "SFNSS1-24G";
@@ -231,7 +223,7 @@ void handleWiFi(void)
       if ((c == '\r') || (c == '\n'))
       {
         szBuf[idxBuf] = '\0';
-        client.flush();
+        // client.flush();
         PRINT("\nRecv: ", szBuf);
         state = S_EXTRACT;
       }
@@ -249,7 +241,7 @@ void handleWiFi(void)
     PRINTS("\nS_EXTRACT");
     // Extract the string from the message if there is one
     newMessageAvailable = getText(szBuf, newMessage, MESG_SIZE);
-    PRINT("\nNew Msg: ", newMessage);
+    Serial.printf("%s%s", "\nNew Msg: ", newMessage);
     state = S_RESPONSE;
     break;
 
@@ -273,7 +265,7 @@ void handleWiFi(void)
   }
 }
 
-void scrollDataSink(uint8_t dev, MD_MAX72XX::transformType_t t, uint8_t col)
+void ICACHE_RAM_ATTR scrollDataSink(uint8_t dev, MD_MAX72XX::transformType_t t, uint8_t col)
 // Callback function for data that is being scrolled off the display
 {
 #if PRINT_CALLBACK
@@ -286,7 +278,7 @@ void scrollDataSink(uint8_t dev, MD_MAX72XX::transformType_t t, uint8_t col)
 #endif
 }
 
-uint8_t scrollDataSource(uint8_t dev, MD_MAX72XX::transformType_t t)
+uint8_t ICACHE_RAM_ATTR scrollDataSource(uint8_t dev, MD_MAX72XX::transformType_t t)
 // Callback function for data that is required for scrolling into the display
 {
   static enum { S_IDLE,
@@ -365,15 +357,7 @@ void scrollText(void)
 
 void setup()
 {
-#if DEBUG
   Serial.begin(115200);
-  PRINTS("\n[MD_MAX72XX WiFi Message Display]\nType a message for the scrolling display from your internet browser");
-#endif
-
-#if LED_HEARTBEAT
-  pinMode(HB_LED, OUTPUT);
-  digitalWrite(HB_LED, LOW);
-#endif
 
   // Display initialization
   mx.begin();
@@ -383,7 +367,7 @@ void setup()
   curMessage[0] = newMessage[0] = '\0';
 
   // Connect to and initialize WiFi network
-  PRINT("\nConnecting to ", ssid);
+  Serial.printf("%s%s", "\nConnecting to ", ssid);
 
   WiFi.begin(ssid, password);
 
@@ -392,29 +376,21 @@ void setup()
     PRINT("\n", err2Str(WiFi.status()));
     delay(500);
   }
-  PRINTS("\nWiFi connected");
+  Serial.printf("%s", "\nWiFi connected");
 
   // Start the server
   server.begin();
-  PRINTS("\nServer started");
+  Serial.printf("%s", "\nServer started");
 
   // Set up first message as the IP address
   sprintf(curMessage, "%03d:%03d:%03d:%03d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
-  PRINT("\nAssigned IP ", curMessage);
+  Serial.printf("%s%s", "\nAssigned IP ", curMessage);
+
+  Serial.printf("%s", "\n[MD_MAX72XX WiFi Message Display]\nType a message for the scrolling display from your internet browser");
 }
 
 void loop()
 {
-#if LED_HEARTBEAT
-  static uint32_t timeLast = 0;
-
-  if (millis() - timeLast >= HB_LED_TIME)
-  {
-    digitalWrite(HB_LED, digitalRead(HB_LED) == LOW ? HIGH : LOW);
-    timeLast = millis();
-  }
-#endif
-
   handleWiFi();
   scrollText();
 }
