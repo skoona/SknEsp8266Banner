@@ -26,6 +26,8 @@ public:
     LedBanner(const char *id, const char *name, const char *cType, const MD_MAX72XX::moduleType_t ledHwType, const int dataPin, const int clkPin, const int csPin, const int maxDevices);
 
     void setNewMessage(const char *pMsg);
+    void setLedBrightness(uint8_t value);
+    void setLedScrollSpeed(uint8_t value);
 
 protected:
     virtual void setup() override;
@@ -40,18 +42,19 @@ private:
     int _devices;
     MD_MAX72XX::moduleType_t _ledHardwareType;
 
+    uint8_t brightness  = 6;
     uint8_t scrollSpeed = 50; // default frame delay value  85 too slow, 25 too fast
+    bool newSpeedAvailable = false;
+    bool newBrightnessAvailable = false;
+
     textEffect_t scrollEffect = PA_SCROLL_LEFT;
     textPosition_t scrollAlign = PA_LEFT;
     uint16_t scrollPause = 2000; // in milliseconds
-    uint8_t brightness = 6;
 
     static const uint16_t MESG_SIZE = 512;
     char curMessage[MESG_SIZE];
     char newMessage[MESG_SIZE];
     bool newMessageAvailable = false;
-    bool newSpeedAvailable = false;
-    bool newBrightnessAvailable = false;
 
     // SPI hardware interface
     MD_Parola Pmx = MD_Parola(_ledHardwareType, _dataIn, _clock, _chipSelect, _devices);

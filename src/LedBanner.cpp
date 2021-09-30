@@ -5,15 +5,58 @@
 #include "LedBanner.hpp"
 
 LedBanner::LedBanner(const char *id, const char *name, const char *cType, const MD_MAX72XX::moduleType_t ledHwType, const int dataPin, const int clkPin, const int csPin, const int maxDevices)
-    : HomieNode(id, name, cType)
+    : HomieNode(id, name, cType),
+      _dataIn(dataPin),
+    _clock(clkPin),
+    _chipSelect(csPin),
+    _devices(maxDevices),
+    _ledHardwareType(ledHwType)
 {
-    _dataIn = dataPin;
-    _clock = clkPin;
-    _chipSelect = csPin;
-    _devices = maxDevices;
-    _ledHardwareType = ledHwType;
+      
     snprintf(curMessage, sizeof(curMessage) - 3, "%s%s", "Welcome to Skoona.net, node: ", getName());
+    snprintf(newMessage, sizeof(newMessage) - 3, "%s%s", "Welcome to Skoona.net, node: ", getName());
+    
+    printCaption();
+}
 
+/**
+ *
+ */
+void LedBanner::setNewMessage(const char *pMsg)
+{
+    if (!newMessageAvailable)
+    {
+        snprintf(newMessage, sizeof(newMessage) - 3, "%s", pMsg);
+        newMessageAvailable = true;
+    }
+}
+
+/**
+ *
+ */
+void LedBanner::setLedBrightness(uint8_t value)
+{
+    if (!newBrightnessAvailable)
+    {
+        if (value > 0 && value <= 15)
+        {
+            brightness = value;
+            newBrightnessAvailable = true;
+        }
+    }
+}
+
+/**
+ *
+ */
+void LedBanner::setLedScrollSpeed(uint8_t value)
+{
+    if (!newSpeedAvailable) {
+        if (value > 0 && value <= 150 ) {
+            scrollSpeed = value;
+            newSpeedAvailable = true;
+        }
+    }
 }
 
 /**
@@ -34,29 +77,15 @@ bool LedBanner::handleInput(const HomieRange &range, const String &property, con
 
     if (property.equalsIgnoreCase(SKN_NODE_MESSAGE_PROPERTY_ID))
     {
-        if (!newMessageAvailable)
-        {
-            snprintf(newMessage, sizeof(newMessage) - 3, "%s", value.c_str());
-            newMessageAvailable = true;
-        }
+        setNewMessage(value.c_str());
     }
     else if (property.equalsIgnoreCase(SKN_NODE_SPEED_PROPERTY_ID))
     {
-        if (!newSpeedAvailable)
-        {
-            scrollSpeed = (uint16_t)value.toInt();
-            snprintf(newMessage, sizeof(newMessage) - 3, "New Speed value is: %s", value.c_str());
-            newSpeedAvailable = true;
-        }
+        setLedScrollSpeed(value.toInt());
     }
     else if (property.equalsIgnoreCase(SKN_NODE_BRIGHTNESS_PROPERTY_ID))
     {
-        if (!newBrightnessAvailable)
-        {
-            brightness = (uint8_t)value.toInt();
-            snprintf(newMessage, sizeof(newMessage) - 3, "New Brightness value is: %s", value.c_str());
-            newBrightnessAvailable = true;
-        }
+        setLedBrightness(value.toInt());
     }
 
     return true;
@@ -97,14 +126,6 @@ void LedBanner::loop()
 /**
  *
  */
-void LedBanner::setNewMessage(const char *pMsg) {
-    snprintf(newMessage, sizeof(newMessage) - 3, "%s", pMsg);
-    newMessageAvailable = true;
-}
-
-/**
- *
- */
 void LedBanner::onReadyToOperate() { Serial.println("Led Node Ready"); }
 
 /**
@@ -124,8 +145,6 @@ void LedBanner::displaySetupHandler()
  */
 void LedBanner::setup()
 {
-    printCaption();
-
     advertise(SKN_NODE_MESSAGE_PROPERTY_ID)
         .setName(SKN_NODE_MESSAGE_PROPERTY_NAME)
         .setDatatype("string")

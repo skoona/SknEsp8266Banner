@@ -37,7 +37,7 @@ bool broadcastHandler(const String &level, const String &value)
   char newMessage[255];
 
   snprintf(newMessage, sizeof(newMessage) - 3, "%s: %s", level.c_str(), value.c_str());
-  // banner.setNewMessage(newMessage);
+  banner.setNewMessage(newMessage);
 
   return true;
 }
@@ -59,8 +59,8 @@ void setup()
       .setValidator([](long candidate)
                     { return candidate > 0 && candidate < 150; });
 
-  uint8_t brightness = (uint8_t)cfgBrightness.get();
-  uint8_t scrollSpeed = (uint8_t)cfgSpeed.get();
+  banner.setLedBrightness((uint8_t)cfgBrightness.get());
+  banner.setLedScrollSpeed((uint8_t)cfgSpeed.get());
 
   Homie.setBroadcastHandler(broadcastHandler)
       .setLedPin(LED_BUILTIN, LOW)
