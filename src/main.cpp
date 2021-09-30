@@ -1,3 +1,4 @@
+// ESP8266 DevKit V1 source
 #include <Arduino.h>
 
 // Use the MD_MAX72XX library to scroll text on the display
@@ -5,392 +6,197 @@
 //
 // Demonstrates the use of the callback function to control what
 // is scrolled on the display text. User can enter text through
-// a web browser and this will display as a scrolling message on
+// a mqtt message and this will display as a scrolling message on
 // the display.
 //
-// IP address for the ESP8266 is displayed on the scrolling display
-// after startup initialization and connected to the WiFi network.
-//
-// Connections for ESP8266 hardware SPI are:
-// Vcc       3v3     LED matrices seem to work at 3.3V
-// GND       GND     GND
-// DIN        D7     HSPID or HMOSI
-// CS or LD   D8     HSPICS or HCS
-// CLK        D5     CLK or HCLK
-//
 
-#include <ESP8266WiFi.h>
+#include <Homie.h>
+#include <MD_Parola.h>
 #include <MD_MAX72xx.h>
 #include <SPI.h>
 
-#define PRINT_CALLBACK 0
-#define DEBUG 0
+#define SKN_MOD_NAME "ESP8266 Max7219 Banner"
+#define SKN_MOD_VERSION "1.0.4"
+#define SKN_MOD_BRAND "SknSensors"
 
-#if DEBUG
-#define PRINT(s, v)     \
-  {                     \
-    Serial.print(F(s)); \
-    Serial.print(v);    \
-  }
-#define PRINTS(s)       \
-  {                     \
-    Serial.print(F(s)); \
-  }
-#else
-#define PRINT(s, v)
-#define PRINTS(s)
-#endif
+#define SKN_NODE_TITLE "Message Banner"
+#define SKN_NODE_TYPE "8x8x8 LED"
+#define SKN_NODE_ID "LEDBanner"
+
+#define SKN_NODE_MESSAGE_PROPERTY_NAME "Banner Text"
+#define SKN_NODE_MESSAGE_PROPERTY_ID "message"
+
+#define SKN_NODE_SPEED_PROPERTY_NAME "Scrolling Speed"
+#define SKN_NODE_SPEED_PROPERTY_ID "speed"
+
+#define SKN_NODE_BRIGHTNESS_PROPERTY_NAME "Display Brightness"
+#define SKN_NODE_BRIGHTNESS_PROPERTY_ID "brightness"
 
 // Define the number of devices we have in the chain and the hardware interface
 // NOTE: These pin numbers will probably not work with your hardware and may
 // need to be adapted
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
-#define MAX_DEVICES 8
+#define MAX_DEVICES 4
 
 #define CLK_PIN  D5  // or SCK
 #define DATA_PIN D7  // or MOSI
 #define CS_PIN   D8  // or SS
 
 // SPI hardware interface
-MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
+MD_Parola Pmx = MD_Parola(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
 
-// WiFi login parameters - network name and password
-const char *ssid = "SFNSS1-24G";
-const char *password = "Apache Tomcat 8";
+uint8_t scrollSpeed = 50; // default frame delay value  85 too slow, 25 too fast
+textEffect_t scrollEffect = PA_SCROLL_LEFT;
+textPosition_t scrollAlign = PA_LEFT;
+uint16_t scrollPause = 2000; // in milliseconds
+uint8_t brightness = 6;
 
-// WiFi Server object and parameters
-WiFiServer server(80);
-
-// Global message buffers shared by Wifi and Scrolling functions
-const uint8_t MESG_SIZE = 255;
-const uint8_t CHAR_SPACING = 1;
-const uint8_t SCROLL_DELAY = 75;
-
-char curMessage[MESG_SIZE];
-char newMessage[MESG_SIZE];
+const uint16_t MESG_SIZE = 512;
+char curMessage[MESG_SIZE] = {""};
+char newMessage[MESG_SIZE] = {""};
 bool newMessageAvailable = false;
+bool newSpeedAvailable = false;
+bool newBrightnessAvailable = false;
 
-const char WebResponse[] = "HTTP/1.1 200 OK\nContent-Type: text/html\n\n";
-
-const char WebPage[] =
-    "<!DOCTYPE html>"
-    "<html>"
-    "<head>"
-    "<title>MajicDesigns Test Page</title>"
-
-    "<script>"
-    "strLine = \"\";"
-
-    "function SendText()"
-    "{"
-    "  nocache = \"/&nocache=\" + Math.random() * 1000000;"
-    "  var request = new XMLHttpRequest();"
-    "  strLine = \"&MSG=\" + document.getElementById(\"txt_form\").Message.value;"
-    "  request.open(\"GET\", strLine + nocache, false);"
-    "  request.send(null);"
-    "}"
-    "</script>"
-    "</head>"
-
-    "<body>"
-    "<p><b>MD_MAX72xx set message</b></p>"
-
-    "<form id=\"txt_form\" name=\"frmText\">"
-    "<label>Msg:<input type=\"text\" name=\"Message\" maxlength=\"255\"></label><br><br>"
-    "</form>"
-    "<br>"
-    "<input type=\"submit\" value=\"Send Text\" onclick=\"SendText()\">"
-    "</body>"
-    "</html>";
-
-const char *err2Str(wl_status_t code)
+bool broadcastHandler(const String &level, const String &value)
 {
-  switch (code)
-  {
-  case WL_IDLE_STATUS:
-    return ("IDLE");
-    break; // WiFi is in process of changing between statuses
-  case WL_NO_SSID_AVAIL:
-    return ("NO_SSID_AVAIL");
-    break; // case configured SSID cannot be reached
-  case WL_CONNECTED:
-    return ("CONNECTED");
-    break; // successful connection is established
-  case WL_CONNECT_FAILED:
-    return ("CONNECT_FAILED");
-    break; // password is incorrect
-  case WL_DISCONNECTED:
-    return ("CONNECT_FAILED");
-    break; // module is not configured in station mode
-  default:
-    return ("??");
-  }
+  Homie.getLogger() << "Received broadcast level " << level << ": " << value << endl;
+
+  // if (!newMessageAvailable) {
+  snprintf(newMessage, sizeof(newMessage) - 3, "%s: %s", level.c_str(), value.c_str());
+  newMessageAvailable = true;
+  // }
+
+  return true;
 }
 
-uint8_t htoi(char c)
+bool nodeInputHandler(const HomieRange &range, const String &property, const String &value)
 {
-  c = toupper(c);
-  if ((c >= '0') && (c <= '9'))
-    return (c - '0');
-  if ((c >= 'A') && (c <= 'F'))
-    return (c - 'A' + 0xa);
-  return (0);
-}
+  Homie.getLogger() << "nodeInputHandler()  " << property << ": " << value << endl;
 
-boolean getText(char *szMesg, char *psz, uint8_t len)
-{
-  boolean isValid = false; // text received flag
-  char *pStart, *pEnd;     // pointer to start and end of text
-
-  // get pointer to the beginning of the text
-  pStart = strstr(szMesg, "/&MSG=");
-
-  if (pStart != NULL)
+  if (property.equalsIgnoreCase(SKN_NODE_MESSAGE_PROPERTY_ID))
   {
-    pStart += 6; // skip to start of data
-    pEnd = strstr(pStart, "/&");
-
-    if (pEnd != NULL)
+    if (!newMessageAvailable)
     {
-      while (pStart != pEnd)
+      snprintf(newMessage, sizeof(newMessage) - 3, "%s", value.c_str());
+      newMessageAvailable = true;
+    }
+  }
+  else if (property.equalsIgnoreCase(SKN_NODE_SPEED_PROPERTY_ID))
+  {
+    if (!newSpeedAvailable)
+    {
+      scrollSpeed = (uint16_t)value.toInt();
+      snprintf(newMessage, sizeof(newMessage) - 3, "New Speed value is: %s", value.c_str());
+      newSpeedAvailable = true;
+    }
+  }
+  else if (property.equalsIgnoreCase(SKN_NODE_BRIGHTNESS_PROPERTY_ID))
+  {
+    if (!newBrightnessAvailable)
+    {
+      brightness = (uint8_t)value.toInt();
+      snprintf(newMessage, sizeof(newMessage) - 3, "New Brightness value is: %s", value.c_str());
+      newBrightnessAvailable = true;
+    }
+  }
+
+  return true;
+}
+
+HomieSetting<long> cfgBrightness("brightness", "The intensity of the leds from 0 thru 15.");
+HomieSetting<long> cfgSpeed("speed", "The scrolling speed in milliseconds.");
+
+HomieNode banner(SKN_NODE_ID, SKN_NODE_TITLE, SKN_NODE_TYPE, false, 0, 0, nodeInputHandler);
+
+void displaySetupHandler()
+  {
+    // Display initialization
+    brightness = (uint8_t)cfgBrightness.get();
+    scrollSpeed = (uint8_t)cfgSpeed.get();
+
+    Pmx.begin();
+    Pmx.setIntensity(brightness); //Intensity 0-15
+    Pmx.displayText(curMessage, scrollAlign, scrollSpeed, scrollPause, scrollEffect, scrollEffect);
+    newMessageAvailable = false;
+  }
+
+void displayLoopHandler()
+  {
+    if (Pmx.displayAnimate())
+    {
+      if (newMessageAvailable)
       {
-        if ((*pStart == '%') && isdigit(*(pStart + 1)))
-        {
-          // replace %xx hex code with the ASCII character
-          char c = 0;
-          pStart++;
-          c += (htoi(*pStart++) << 4);
-          c += htoi(*pStart++);
-          *psz++ = c;
-        }
-        else
-          *psz++ = *pStart++;
+        strcpy(curMessage, newMessage);
+        banner.setProperty(SKN_NODE_MESSAGE_PROPERTY_ID).send(newMessage);
+        newMessageAvailable = false;
       }
 
-      *psz = '\0'; // terminate the string
-      isValid = true;
-    }
-  }
-
-  return (isValid);
-}
-
-void handleWiFi(void)
-{
-  static enum { S_IDLE,
-                S_WAIT_CONN,
-                S_READ,
-                S_EXTRACT,
-                S_RESPONSE,
-                S_DISCONN } state = S_IDLE;
-  static char szBuf[1024];
-  static uint16_t idxBuf = 0;
-  static WiFiClient client;
-  static uint32_t timeStart;
-
-  switch (state)
-  {
-  case S_IDLE: // initialize
-    PRINTS("\nS_IDLE");
-    idxBuf = 0;
-    state = S_WAIT_CONN;
-    break;
-
-  case S_WAIT_CONN: // waiting for connection
-  {
-    client = server.available();
-    if (!client)
-      break;
-    if (!client.connected())
-      break;
-
-#if DEBUG
-    char szTxt[20];
-    sprintf(szTxt, "%03d:%03d:%03d:%03d", client.remoteIP()[0], client.remoteIP()[1], client.remoteIP()[2], client.remoteIP()[3]);
-    PRINT("\nNew client @ ", szTxt);
-#endif
-
-    timeStart = millis();
-    state = S_READ;
-  }
-  break;
-
-  case S_READ: // get the first line of data
-    PRINTS("\nS_READ");
-    while (client.available())
-    {
-      char c = client.read();
-      if ((c == '\r') || (c == '\n'))
+      if (newSpeedAvailable)
       {
-        szBuf[idxBuf] = '\0';
-        // client.flush();
-        PRINT("\nRecv: ", szBuf);
-        state = S_EXTRACT;
+        Pmx.setSpeed(scrollSpeed);
+        banner.setProperty(SKN_NODE_SPEED_PROPERTY_ID).send(String(scrollSpeed));
+        newSpeedAvailable = false;
       }
-      else
-        szBuf[idxBuf++] = (char)c;
+
+      if (newBrightnessAvailable)
+      {
+        Pmx.setIntensity(brightness);
+        banner.setProperty(SKN_NODE_BRIGHTNESS_PROPERTY_ID).send(String(brightness));
+        newBrightnessAvailable = false;
+      }
+
+      Pmx.displayReset();
     }
-    if (millis() - timeStart > 1000)
-    {
-      PRINTS("\nWait timeout");
-      state = S_DISCONN;
-    }
-    break;
-
-  case S_EXTRACT: // extract data
-    PRINTS("\nS_EXTRACT");
-    // Extract the string from the message if there is one
-    newMessageAvailable = getText(szBuf, newMessage, MESG_SIZE);
-    Serial.printf("%s%s", "\nNew Msg: ", newMessage);
-    state = S_RESPONSE;
-    break;
-
-  case S_RESPONSE: // send the response to the client
-    PRINTS("\nS_RESPONSE");
-    // Return the response to the client (web page)
-    client.print(WebResponse);
-    client.print(WebPage);
-    state = S_DISCONN;
-    break;
-
-  case S_DISCONN: // disconnect client
-    PRINTS("\nS_DISCONN");
-    client.flush();
-    client.stop();
-    state = S_IDLE;
-    break;
-
-  default:
-    state = S_IDLE;
-  }
-}
-
-void ICACHE_RAM_ATTR scrollDataSink(uint8_t dev, MD_MAX72XX::transformType_t t, uint8_t col)
-// Callback function for data that is being scrolled off the display
-{
-#if PRINT_CALLBACK
-  Serial.print("\n cb ");
-  Serial.print(dev);
-  Serial.print(' ');
-  Serial.print(t);
-  Serial.print(' ');
-  Serial.println(col);
-#endif
-}
-
-uint8_t ICACHE_RAM_ATTR scrollDataSource(uint8_t dev, MD_MAX72XX::transformType_t t)
-// Callback function for data that is required for scrolling into the display
-{
-  static enum { S_IDLE,
-                S_NEXT_CHAR,
-                S_SHOW_CHAR,
-                S_SHOW_SPACE } state = S_IDLE;
-  static char *p;
-  static uint16_t curLen, showLen;
-  static uint8_t cBuf[8];
-  uint8_t colData = 0;
-
-  // finite state machine to control what we do on the callback
-  switch (state)
-  {
-  case S_IDLE: // reset the message pointer and check for new message to load
-    PRINTS("\nS_IDLE");
-    p = curMessage;          // reset the pointer to start of message
-    if (newMessageAvailable) // there is a new message waiting
-    {
-      strcpy(curMessage, newMessage); // copy it in
-      newMessageAvailable = false;
-    }
-    state = S_NEXT_CHAR;
-    break;
-
-  case S_NEXT_CHAR: // Load the next character from the font table
-    PRINTS("\nS_NEXT_CHAR");
-    if (*p == '\0')
-      state = S_IDLE;
-    else
-    {
-      showLen = mx.getChar(*p++, sizeof(cBuf) / sizeof(cBuf[0]), cBuf);
-      curLen = 0;
-      state = S_SHOW_CHAR;
-    }
-    break;
-
-  case S_SHOW_CHAR: // display the next part of the character
-    PRINTS("\nS_SHOW_CHAR");
-    colData = cBuf[curLen++];
-    if (curLen < showLen)
-      break;
-
-    // set up the inter character spacing
-    showLen = (*p != '\0' ? CHAR_SPACING : (MAX_DEVICES * COL_SIZE) / 2);
-    curLen = 0;
-    state = S_SHOW_SPACE;
-    // fall through
-
-  case S_SHOW_SPACE: // display inter-character spacing (blank column)
-    PRINT("\nS_ICSPACE: ", curLen);
-    PRINT("/", showLen);
-    curLen++;
-    if (curLen == showLen)
-      state = S_NEXT_CHAR;
-    break;
-
-  default:
-    state = S_IDLE;
   }
 
-  return (colData);
-}
-
-void scrollText(void)
-{
-  static uint32_t prevTime = 0;
-
-  // Is it time to scroll the text?
-  if (millis() - prevTime >= SCROLL_DELAY)
-  {
-    mx.transform(MD_MAX72XX::TSL); // scroll along - the callback will load all the data
-    prevTime = millis();           // starting point for next time
-  }
-}
-
-void setup()
-{
+void setup() {
   Serial.begin(115200);
 
-  // Display initialization
-  mx.begin();
-  mx.setShiftDataInCallback(scrollDataSource);
-  mx.setShiftDataOutCallback(scrollDataSink);
-
-  curMessage[0] = newMessage[0] = '\0';
-
-  // Connect to and initialize WiFi network
-  Serial.printf("%s%s", "\nConnecting to ", ssid);
-
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    PRINT("\n", err2Str(WiFi.status()));
-    delay(500);
-  }
-  Serial.printf("%s", "\nWiFi connected");
-
-  // Start the server
-  server.begin();
-  Serial.printf("%s", "\nServer started");
-
   // Set up first message as the IP address
-  sprintf(curMessage, "%03d:%03d:%03d:%03d", WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
+  snprintf(curMessage, sizeof(curMessage) - 3, "%s", "Welcome to Skoona.net");
   Serial.printf("%s%s", "\nAssigned IP ", curMessage);
 
-  Serial.printf("%s", "\n[MD_MAX72XX WiFi Message Display]\nType a message for the scrolling display from your internet browser");
+  Homie_setFirmware(SKN_MOD_NAME, SKN_MOD_VERSION);
+  Homie_setBrand(SKN_MOD_BRAND);
+
+  cfgBrightness
+      .setDefaultValue(brightness)
+      .setValidator([](long candidate)
+                    { return candidate > 0 && candidate < 15; });
+
+  cfgSpeed
+      .setDefaultValue(scrollSpeed)
+      .setValidator([](long candidate)
+                    { return candidate > 0 && candidate < 150; });
+
+  Homie.setBroadcastHandler(broadcastHandler)
+      .setLedPin(LED_BUILTIN, LOW)
+      .disableResetTrigger()
+      .setSetupFunction(displaySetupHandler)
+      .setLoopFunction(displayLoopHandler);
+
+  banner.advertise(SKN_NODE_MESSAGE_PROPERTY_ID)
+      .setName(SKN_NODE_MESSAGE_PROPERTY_NAME)
+      .setDatatype("string")
+      .setRetained(true)
+      .settable();
+
+  banner.advertise(SKN_NODE_SPEED_PROPERTY_ID)
+      .setName(SKN_NODE_SPEED_PROPERTY_NAME)
+      .setDatatype("integer")
+      .setRetained(true)
+      .settable();
+
+  banner.advertise(SKN_NODE_BRIGHTNESS_PROPERTY_ID)
+      .setName(SKN_NODE_BRIGHTNESS_PROPERTY_NAME)
+      .setDatatype("integer")
+      .setRetained(true)
+      .settable();
+
+  Homie.setup();
 }
 
-void loop()
-{
-  handleWiFi();
-  scrollText();
+void loop() {
+  Homie.loop();    
 }
