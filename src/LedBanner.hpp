@@ -23,7 +23,8 @@ class LedBanner : public HomieNode
 {
 
 public:
-    LedBanner(const char *id, const char *name, const char *cType, const MD_MAX72XX::moduleType_t ledHwType, const int dataPin, const int clkPin, const int csPin, const int maxDevices);
+    LedBanner(const char *id, const char *name, const char *cType, 
+              const MD_MAX72XX::moduleType_t ledHwType, const int dataPin, const int clkPin, const int csPin, const int maxDevices);
 
     void setNewMessage(const char *pMsg);
     void setLedBrightness(uint8_t value);
