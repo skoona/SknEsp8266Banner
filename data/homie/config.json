@@ -1,6 +1,6 @@
 {
-    "name": "Max7219 8x8x4 LED Banner",
-    "device_id": "ESP8266Banner",
+  "name": "Max7219 8x8x4 LED Banner",
+  "device_id": "OfficeBanner",
   "device_stats_interval": 300,  
   "wifi": {
     "ssid": "SFNSS1-24G",
@@ -9,7 +9,7 @@
   "mqtt": {
     "host": "openhab.skoona.net",
     "port": 1883,
-	"base_topic": "sknSensors/",
+	  "base_topic": "sknSensors/",
     "auth": true,
     "username": "openhabian",
     "password": "Apache.Tomcat.8"
@@ -18,7 +18,7 @@
     "enabled": true
   },
   "settings": {
-	  "speed": 25,
+	  "speed": 60,
 	  "brightness": 2
   }
 }

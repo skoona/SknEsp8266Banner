@@ -4,8 +4,8 @@
 #include <Homie.h>
 #include "LedBanner.hpp"
 
-#define SKN_MOD_NAME "Max7219 Banner"
-#define SKN_MOD_VERSION "1.0.5"
+#define SKN_MOD_NAME "Max7219 Office Banner"
+#define SKN_MOD_VERSION "2.0.0"
 #define SKN_MOD_BRAND "SknSensors"
 
 #define SKN_NODE_TITLE "Message Banner"
@@ -13,13 +13,13 @@
 #define SKN_NODE_ID "LEDBanner"
 
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
-#define MAX_DEVICES 4
+#define MAX_DEVICES 12  // 4
 
 // SPI Pins
 #ifdef ESP8266
-#define CLK_PIN  14  // D5  // or SCK
-#define DATA_PIN 13  // D7  // or MOSI
-#define CS_PIN   15  // D8  // or SS
+#define CLK_PIN  14  // D5  // or SCK  14
+#define DATA_PIN 13  // D7  // or MOSI 13
+#define CS_PIN   15  // D8  // or SS   15
 #else
 #define CLK_PIN  18  // or SCK
 #define DATA_PIN 23  // or MOSI
