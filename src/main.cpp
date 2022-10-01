@@ -5,7 +5,7 @@
 #include "LedBanner.hpp"
 
 #define SKN_MOD_NAME "Max7219 Office Banner"
-#define SKN_MOD_VERSION "2.0.0"
+#define SKN_MOD_VERSION "2.1.0"
 #define SKN_MOD_BRAND "SknSensors"
 
 #define SKN_NODE_TITLE "Message Banner"
@@ -30,6 +30,18 @@ HomieSetting<long> cfgBrightness("brightness", "The intensity of the leds from 0
 HomieSetting<long> cfgSpeed("speed", "The scrolling speed in milliseconds.");
 
 LedBanner banner(SKN_NODE_ID, SKN_NODE_TITLE, SKN_NODE_TYPE, HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
+
+
+/**
+ * look for events that block sending property info */
+void onHomieEvent(const HomieEvent& event) {
+  switch (event.type) {
+    case HomieEventType::WIFI_DISCONNECTED:
+      Serial << "WiFi disconnected" << endl;
+      ESP.restart();
+      break;
+  }
+}
 
 bool broadcastHandler(const String &level, const String &value)
 {
@@ -64,7 +76,8 @@ void setup()
 
   Homie.setBroadcastHandler(broadcastHandler)
       .setLedPin(LED_BUILTIN, LOW)
-      .disableResetTrigger();
+      .disableResetTrigger()
+      .onEvent(onHomieEvent);
 
   Homie.setup();
 }

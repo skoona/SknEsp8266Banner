@@ -1,18 +1,18 @@
 {
   "name": "Max7219 8x8x4 LED Banner",
-  "device_id": "OfficeBanner",
+  "device_id": "LEDBanner",
   "device_stats_interval": 300,  
   "wifi": {
-    "ssid": "SFNSS1-24G",
-    "password": "Apache Tomcat 8"
+    "ssid": "YOUR-SSID",
+    "password": "YOUR-SSID-PASSWORD"
   },
   "mqtt": {
-    "host": "openhab.skoona.net",
+    "host": "YOUR-MQTT-HOST-NAME-OR-IP",
     "port": 1883,
-	  "base_topic": "sknSensors/",
+	  "base_topic": "homie/",
     "auth": true,
-    "username": "openhabian",
-    "password": "Apache.Tomcat.8"
+    "username": "YOUR-MQTT-USERNAME",
+    "password": "YOUR-MQTT-PASSWORD"
   },
   "ota": {
     "enabled": true
