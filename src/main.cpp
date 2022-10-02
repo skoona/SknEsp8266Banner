@@ -5,7 +5,7 @@
 #include "LedBanner.hpp"
 
 #define SKN_MOD_NAME "Max7219 Office Banner"
-#define SKN_MOD_VERSION "2.1.0"
+#define SKN_MOD_VERSION "2.1.1"
 #define SKN_MOD_BRAND "SknSensors"
 
 #define SKN_NODE_TITLE "Message Banner"
