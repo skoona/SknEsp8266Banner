@@ -126,7 +126,7 @@ void LedBanner::loop()
 /**
  *
  */
-void LedBanner::onReadyToOperate() { Serial.println("Led Node Ready"); }
+void LedBanner::onReadyToOperate() { Serial.println("Led Node Ready"); wasReady = true; }
 
 /**
  * @brief 

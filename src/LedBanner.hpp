@@ -19,6 +19,8 @@
 #define SKN_NODE_BRIGHTNESS_PROPERTY_NAME "Display Brightness"
 #define SKN_NODE_BRIGHTNESS_PROPERTY_ID "brightness"
 
+extern volatile bool wasReady;
+
 class LedBanner : public HomieNode
 {
 

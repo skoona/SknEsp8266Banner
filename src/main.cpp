@@ -31,6 +31,7 @@ HomieSetting<long> cfgSpeed("speed", "The scrolling speed in milliseconds.");
 
 LedBanner banner(SKN_NODE_ID, SKN_NODE_TITLE, SKN_NODE_TYPE, HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
 
+volatile bool wasReady = false;
 
 /**
  * look for events that block sending property info */
@@ -38,8 +39,13 @@ void onHomieEvent(const HomieEvent& event) {
   switch (event.type) {
     case HomieEventType::WIFI_DISCONNECTED:
       Serial << "WiFi disconnected" << endl;
-      ESP.restart();
       break;
+    case HomieEventType::MQTT_DISCONNECTED:
+      Serial << "MQTT disconnected, reason: " << (int8_t)event.mqttReason << endl;
+      if(wasReady) {
+        ESP.restart();
+      }
+    break;
   }
 }
 
