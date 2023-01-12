@@ -1,4 +1,12 @@
 /**
+ * @file LedBanner.hpp
+ * @author James Scott Jr (skoona@gmail.com)
+ * @brief 
+ * @version 2.1.1
+ * @date 2023-01-11
+ * 
+ * @copyright Copyright (c) 2023
+ * 
  * Homie Node for Max7219 8x8 Banners.
  *
  */
@@ -18,6 +26,9 @@
 
 #define SKN_NODE_BRIGHTNESS_PROPERTY_NAME "Display Brightness"
 #define SKN_NODE_BRIGHTNESS_PROPERTY_ID "brightness"
+
+#define SKN_NODE_REBOOT_PROPERTY_NAME "Reboot ESP"
+#define SKN_NODE_REBOOT_PROPERTY_ID "reboot"
 
 extern volatile bool wasReady;
 
@@ -60,7 +71,7 @@ private:
     bool newMessageAvailable = false;
 
     // SPI hardware interface
-    MD_Parola Pmx = MD_Parola(_ledHardwareType, _dataIn, _clock, _chipSelect, _devices);
+    MD_Parola Pmx; 
 
     void printCaption();
     void displaySetupHandler();

@@ -1,4 +1,12 @@
 /**
+ * @file LedBanner.cpp
+ * @author James Scott Jr (skoona@gmail.com)
+ * @brief 
+ * @version 2.1.1
+ * @date 2023-01-11
+ * 
+ * @copyright Copyright (c) 2023
+ * 
  * Homie Node for Max7219 8x8 Banners.
  *
  */
@@ -6,11 +14,12 @@
 
 LedBanner::LedBanner(const char *id, const char *name, const char *cType, const MD_MAX72XX::moduleType_t ledHwType, const int dataPin, const int clkPin, const int csPin, const int maxDevices)
     : HomieNode(id, name, cType),
-      _dataIn(dataPin),
+    _dataIn(dataPin),
     _clock(clkPin),
     _chipSelect(csPin),
     _devices(maxDevices),
-    _ledHardwareType(ledHwType)
+    _ledHardwareType(ledHwType),
+    Pmx(_ledHardwareType, _dataIn, _clock, _chipSelect, _devices)
 {
       
     snprintf(curMessage, sizeof(curMessage) - 3, "%s%s", "Welcome to Skoona.net, node: ", getName());
@@ -86,6 +95,10 @@ bool LedBanner::handleInput(const HomieRange &range, const String &property, con
     else if (property.equalsIgnoreCase(SKN_NODE_BRIGHTNESS_PROPERTY_ID))
     {
         setLedBrightness(value.toInt());
+    } 
+    else if (property.equalsIgnoreCase(SKN_NODE_REBOOT_PROPERTY_ID))
+    {
+        ESP.restart();
     }
 
     return true;
